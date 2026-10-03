@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/products")
+@RequestMapping({"/api/products", "/products"})
 @Tag(name = "Produtos", description = "Cadastro, consulta e exclusão de produtos.")
 public class ProductController {
 

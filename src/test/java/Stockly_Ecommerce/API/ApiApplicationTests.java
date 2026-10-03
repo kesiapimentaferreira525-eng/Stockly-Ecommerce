@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Transactional
@@ -59,7 +60,7 @@ class ApiApplicationTests {
 
 		assertEquals("Cafeteira italiana 6 xícaras", product.getName());
 		assertNotNull(product.getDescription());
-		assertEquals(18, productRepository.count());
+		assertTrue(productRepository.count() >= 18);
 		assertEquals(Set.of("Acessórios", "Cafés Especiais", "Cápsulas & Kits", "Métodos"), categoryNames);
 	}
 

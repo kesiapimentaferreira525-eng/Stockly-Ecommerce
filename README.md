@@ -1,19 +1,18 @@
 # Stockly Ecommerce API
 
-API REST para operações básicas de produtos e pedidos de um e-commerce, desenvolvida com Java 17, Spring Boot e MySQL.
+API REST para catálogo de produtos e checkout de pedidos, desenvolvida com Java 17, Spring Boot e MySQL.
 
-## Funcionalidades implementadas
+## Sumário
 
-- Cadastro e consulta de produtos.
-- Cadastro de produtos com escolha entre as categorias disponíveis.
-- Exclusão de produto somente quando o estoque está zerado e não existem vendas.
-- Criação de pedidos com validação de estoque.
-- Baixa do estoque e gravação do pedido na mesma transação.
-- Cálculo do valor total do pedido a partir do preço do produto e da quantidade.
-- Carga idempotente de produtos de demonstração no MySQL durante a inicialização.
-- Tratamento de erros para produto inexistente e estoque insuficiente.
-- Persistência com Spring Data JPA e geração de UUIDs para as entidades.
-- CORS liberado para o frontend local em `localhost:4200` e `localhost:8080` (também aceita `127.0.0.1`).
+- [Tecnologias](#tecnologias)
+- [Requisitos](#requisitos)
+- [Configuração e execução](#configuração-e-execução)
+- [Documentação da API](#documentação-da-api)
+- [Endpoints](#endpoints)
+- [Carga inicial do catálogo](#carga-inicial-do-catálogo)
+- [Testes](#testes)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Escopo atual](#escopo-atual)
 
 ## Tecnologias
 
@@ -21,13 +20,19 @@ API REST para operações básicas de produtos e pedidos de um e-commerce, desen
 - Spring Boot 4
 - Spring Web MVC
 - Spring Data JPA / Hibernate
-- MySQL Connector
+- MySQL
 - Lombok
 - Maven
 
+## Requisitos
+
+- Java 17
+- MySQL disponível localmente ou em outro endereço configurado
+- Banco de dados `Ecommerce` criado
+
 ## Configuração e execução
 
-É necessário ter Java 17 e MySQL disponíveis. Crie um banco chamado `Ecommerce` e configure as variáveis de ambiente antes de iniciar a aplicação:
+Configure as variáveis de ambiente e inicie a aplicação pelo PowerShell:
 
 ```powershell
 $env:DB_URL = "jdbc:mysql://localhost:3306/Ecommerce"
@@ -37,33 +42,37 @@ $env:STORE_PICKUP_LOCATION = "Endereço completo da loja"
 .\mvnw.cmd spring-boot:run
 ```
 
-Execute os comandos na mesma sessão do PowerShell. `DB_URL` pode ser omitida quando o banco estiver no endereço padrão `localhost:3306/Ecommerce`. Configure `STORE_PICKUP_LOCATION` com o endereço real da loja para mostrá-lo na confirmação de retirada. A configuração de produção está em `src/main/resources/application.properties`; o Hibernate atualiza o esquema existente ao iniciar (`spring.jpa.hibernate.ddl-auto=update`). A API fica disponível na porta `8081`.
+Execute os comandos na mesma sessão do PowerShell. `DB_URL` pode ser omitida quando o banco estiver no endereço padrão `localhost:3306/Ecommerce`. Configure `STORE_PICKUP_LOCATION` com o endereço da loja que será exibido em pedidos para retirada.
 
-Para executar os testes:
+A API fica disponível em `http://localhost:8081`. O Hibernate atualiza o esquema existente ao iniciar (`spring.jpa.hibernate.ddl-auto=update`).
 
-```powershell
-.\mvnw.cmd test
-```
+O CORS permite requisições de `localhost:4200` e `localhost:8080`, incluindo os mesmos endereços via `127.0.0.1`.
 
-Os testes também usam o MySQL configurado pelas variáveis `DB_URL`, `DB_USERNAME` e `DB_PASSWORD`. As operações dos testes são transacionais e revertidas ao final de cada teste; a carga inicial de demonstração continua idempotente.
+## Documentação da API
 
-## Swagger / OpenAPI
+- Swagger UI: `http://localhost:8081/swagger-ui/index.html`
+- OpenAPI JSON: `http://localhost:8081/v3/api-docs`
 
-Com a API em execução, acesse a interface interativa em `http://localhost:8081/swagger-ui/index.html`. O contrato OpenAPI em JSON fica em `http://localhost:8081/v3/api-docs`.
+Os endpoints de negócio aceitam o prefixo `/api` e também os caminhos sem prefixo (`/products`, `/categories` e `/orders`). As rotas sem prefixo mantêm compatibilidade com o proxy de desenvolvimento do front, que remove `/api` antes de encaminhar as requisições.
 
 ## Endpoints
 
+### Categorias
+
+| Método | Caminho | Descrição | Resposta |
+| --- | --- | --- | --- |
+| `GET` | `/api/categories` | Lista categorias com produtos cadastrados | `200 OK` |
+
 ### Produtos
 
-| Método   | Caminho          | Descrição                                 | Resposta                           |
-| -------- | ---------------- | ----------------------------------------- | ---------------------------------- |
-| `GET`    | `/products`      | Lista todos os produtos                   | `200 OK`                           |
-| `GET`    | `/products/{id}` | Consulta produto pelo UUID                | `200 OK` ou `404 Not Found`        |
-| `POST`   | `/products`      | Cadastra um produto                       | `201 Created`                      |
-| `DELETE` | `/products/{id}` | Exclui produto sem estoque e sem vendas   | `204 No Content` ou `409 Conflict` |
-| `GET`    | `/categories`    | Lista categorias com produtos cadastrados | `200 OK`                           |
+| Método | Caminho | Descrição | Resposta |
+| --- | --- | --- | --- |
+| `GET` | `/api/products` | Lista todos os produtos | `200 OK` |
+| `GET` | `/api/products/{id}` | Consulta produto pelo UUID | `200 OK` ou `404 Not Found` |
+| `POST` | `/api/products` | Cadastra um produto | `201 Created` |
+| `DELETE` | `/api/products/{id}` | Exclui produto sem estoque e sem vendas | `204 No Content` ou `409 Conflict` |
 
-Exemplo de cadastro (use um `categoryId` retornado por `GET /categories`):
+Para cadastrar um produto, informe um `categoryId` retornado por `GET /api/categories`:
 
 ```json
 {
@@ -76,17 +85,15 @@ Exemplo de cadastro (use um `categoryId` retornado por `GET /categories`):
 }
 ```
 
-O cadastro valida SKU único, nome, descrição, preço positivo, estoque não negativo e categoria existente. A opção de exclusão aparece no catálogo para produtos sem estoque e sem vendas; a API também aplica essas regras e responde `409 Conflict` quando a exclusão não é permitida.
-
-Na primeira inicialização, a aplicação cria quatro categorias e 18 produtos de demonstração se eles ainda não existirem: `Acessórios`, `Cafés Especiais`, `Cápsulas & Kits` e `Métodos`. A carga preserva os produtos e estoques existentes; produtos legados sem SKU ou descrição recebem valores para aparecer corretamente no catálogo.
+O cadastro valida SKU único, nome, descrição, preço positivo, estoque não negativo e categoria existente. Um produto só pode ser excluído quando não possui estoque nem vendas; caso contrário, a API responde `409 Conflict`.
 
 ### Pedidos
 
-| Método | Caminho   | Descrição                      | Resposta                                            |
-| ------ | --------- | ------------------------------ | --------------------------------------------------- |
-| `POST` | `/orders` | Finaliza uma compra             | `201 Created`, `400 Bad Request` ou `404 Not Found` |
+| Método | Caminho | Descrição | Resposta |
+| --- | --- | --- | --- |
+| `POST` | `/api/orders` | Finaliza uma compra | `201 Created`, `400 Bad Request` ou `404 Not Found` |
 
-Corpo da requisição:
+Exemplo de requisição para entrega:
 
 ```json
 {
@@ -107,21 +114,42 @@ Corpo da requisição:
 }
 ```
 
-O checkout registra nome do comprador, quantidade, modalidade (`DELIVERY` ou `STORE_PICKUP`) e forma de pagamento (`PIX`, `CREDIT_CARD`, `DEBIT_CARD` ou `CASH`). Para entrega, CEP, rua, número, bairro, cidade e UF são obrigatórios; para retirada, o endereço é dispensado e o comprovante mostra o local definido por `STORE_PICKUP_LOCATION` (padrão: endereço a configurar).
+O checkout aceita as modalidades `DELIVERY` e `STORE_PICKUP`, e as formas de pagamento `PIX`, `CREDIT_CARD`, `DEBIT_CARD` e `CASH`.
 
-Quando o estoque é suficiente, a API reduz a quantidade e grava o pedido e os dados do checkout na mesma transação. A tela então exibe a confirmação com número do pedido, comprador, itens, total, recebimento, endereço ou local de retirada e pagamento escolhido. O sistema registra a forma de pagamento, mas não processa cobranças em um gateway externo.
+- Para entrega, CEP, rua, número, bairro, cidade e UF são obrigatórios.
+- Para retirada, `deliveryAddress` pode ser omitido; a confirmação informa o endereço configurado em `STORE_PICKUP_LOCATION`.
+- Com estoque suficiente, o pedido é gravado e o estoque é reduzido na mesma transação.
+- A resposta inclui número do pedido, produto, quantidade, total, estoque restante, comprador, modalidade, pagamento, endereço ou local de retirada e status.
+- A API registra a forma de pagamento, mas não processa cobranças em um gateway externo.
+- Produto inexistente retorna `404 Not Found`; dados inválidos ou estoque insuficiente retornam `400 Bad Request`.
 
-Se o produto não existir, a API retorna `404 Not Found`. Se os dados estiverem incompletos ou o estoque não for suficiente, retorna `400 Bad Request`. A resposta inclui número do pedido, produto, quantidade, total, estoque restante, comprador, modalidade, pagamento escolhido, endereço ou local de retirada e status.
+## Carga inicial do catálogo
+
+Na primeira inicialização, a aplicação cria quatro categorias e 18 produtos de demonstração caso ainda não existam: `Acessórios`, `Cafés Especiais`, `Cápsulas & Kits` e `Métodos`.
+
+A carga é idempotente e preserva produtos e estoques existentes. Produtos legados sem SKU ou descrição recebem valores para aparecer corretamente no catálogo.
+
+## Testes
+
+Execute os testes com:
+
+```powershell
+.\mvnw.cmd test
+```
+
+Os testes usam o MySQL configurado por `DB_URL`, `DB_USERNAME` e `DB_PASSWORD`. As operações de teste são transacionais e revertidas ao final de cada teste.
 
 ## Estrutura do projeto
 
-- `Controller`: endpoints REST de produtos e pedidos.
-- `Service`: regras de negócio para criação de pedidos.
-- `Repository`: acesso ao banco via Spring Data JPA.
-- `Model`: entidades `Product`, `Category` e `Order`.
-- `DTO`: formatos de entrada e saída de pedidos.
-- `Exception`: exceções de negócio e tratamento global dos erros.
+| Diretório | Responsabilidade |
+| --- | --- |
+| `Controller` | Endpoints REST de categorias, produtos e pedidos |
+| `Service` | Regras de negócio de produtos e pedidos |
+| `Repository` | Acesso ao banco via Spring Data JPA |
+| `Model` | Entidades `Product`, `Category` e `Order` |
+| `DTO` | Formatos de entrada e saída da API |
+| `Exception` | Exceções de negócio e tratamento global de erros |
 
 ## Escopo atual
 
-A API implementa consulta, cadastro e exclusão condicionada de produtos, consulta de categorias e criação de pedidos. Não há endpoints para atualizar produtos ou consultar pedidos, nem autenticação/autorização.
+A API implementa consulta de categorias, consulta, cadastro e exclusão condicionada de produtos e criação de pedidos. Não há endpoints para atualizar produtos ou consultar pedidos, nem autenticação ou autorização.
